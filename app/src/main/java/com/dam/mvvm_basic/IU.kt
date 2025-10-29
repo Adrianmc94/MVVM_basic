@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.collectAsState
 
 /**
  * Interfaz de usuario
@@ -37,7 +38,7 @@ fun IU(miViewModel: MyViewModel) {
     val TAG_LOG: String = "miDebug"
 
     // variable para el estado del boton
-    var estadoActual = miViewModel.estadoActual.collectState()
+    var estadoActual = miViewModel.estadoActual.collectAsState()
 
 
     // botones en horizontal
