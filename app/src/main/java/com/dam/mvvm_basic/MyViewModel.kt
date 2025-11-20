@@ -57,14 +57,14 @@ class MyViewModel(): ViewModel() {
             estadoActual.value = Estados.INICIO
             Log.d(TAG_LOG, "GANAMOS - Estado: ${estadoActual.value}")
             //lanzamos estados auxiliares en paralelo
-            estadosAuxiliares("WIN")
+            estadosAuxiliares("Ganador")
             true
         } else {
             Log.d(TAG_LOG, "no es correcto")
             estadoActual.value = Estados.ADIVINANDO
             Log.d(TAG_LOG, "otro intento - Estado: ${estadoActual.value}")
             //lanzamos estados auxiliares en paralelo
-            estadosAuxiliares("FAIL")
+            estadosAuxiliares("Fallo")
             false
         }
     }
