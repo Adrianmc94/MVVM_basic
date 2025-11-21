@@ -1,93 +1,135 @@
 package com.dam.mvvm_basic
-
 import android.util.Log
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.random.Random // Necesario para crearRandom
 
 class MyViewModel(): ViewModel() {
 
-    // etiqueta para logcat
     private val TAG_LOG = "miDebug"
+    // Estado del juego (observable por la IU)
+    var _estadoJuego = mutableStateOf(Datos.estadoJuego)
+        private set
 
-    // estados del juego
-    // usamos LiveData para que la IU se actualice
-    // patron de diseño observer
-    val estadoActual = MutableStateFlow(Estados.INICIO)
+    // Cuenta atrás (observable por la IU)
+    var _cuentaAtras = mutableIntStateOf(Datos.cuentaAtras)
+        private set
 
-    // este va a ser nuestra lista para la secuencia random
-    // usamos mutable, ya que la queremos modificar
-    var _numbers = MutableStateFlow(0)
+    // Job para cancelar la corrutina de cuenta atrás
+    private var countdownJob: Job? = null
 
-    // inicializamos variables cuando instanciamos
+
     init {
-        // estado inicial
-        Log.d(TAG_LOG, "Inicializamos ViewModel - Estado: ${estadoActual.value}")
+        Log.d(TAG_LOG, "Inicializamos ViewModel. Estado: INICIO")
     }
+
 
     /**
-     * crear entero random
+     * Inicia la secuencia de juego.
      */
-    fun crearRandom() {
-        // cambiamos estado, por lo tanto la IU se actualiza
-        estadoActual.value = Estados.GENERANDO
-        _numbers.value = (0..3).random()
-        Log.d(TAG_LOG, "creamos random ${_numbers.value} - Estado: ${estadoActual.value}")
-        actualizarNumero(_numbers.value)
-    }
+    fun iniciarJuego() {
+        if (_estadoJuego.value == Estados.INICIO || _estadoJuego.value == Estados.FINALIZADO) {
+            actualizarEstado(Estados.GENERANDO)
+            crearRandom()
+            iniciarCuentaAtras()
 
-    fun actualizarNumero(numero: Int) {
-        Log.d(TAG_LOG, "actualizamos numero en Datos - Estado: ${estadoActual.value}")
-        Datos.numero = numero
-        // cambiamos estado, por lo tanto la IU se actualiza
-        estadoActual.value = Estados.ADIVINANDO
-    }
-
-    /**
-     * comprobar si el boton pulsado es el correcto
-     * @param ordinal: Int numero de boton pulsado
-     * @return Boolean si coincide TRUE, si no FALSE
-     */
-    fun comprobar(ordinal: Int): Boolean {
-        Log.d(TAG_LOG, "comprobamos - Estado: ${estadoActual.value}")
-        return if (ordinal == Datos.numero) {
-            Log.d(TAG_LOG, "es correcto")
-            estadoActual.value = Estados.INICIO
-            Log.d(TAG_LOG, "GANAMOS - Estado: ${estadoActual.value}")
-            //lanzamos estados auxiliares en paralelo
-            estadosAuxiliares("Ganador")
-            true
-        } else {
-            Log.d(TAG_LOG, "no es correcto")
-            estadoActual.value = Estados.ADIVINANDO
-            Log.d(TAG_LOG, "otro intento - Estado: ${estadoActual.value}")
-            //lanzamos estados auxiliares en paralelo
-            estadosAuxiliares("Fallo")
-            false
+            // LLAMADA E3: Llamamos a la función auxiliar al iniciar
+            estadosAuxiliares("Mensaje Inicial: Vamos a jugar!")
         }
     }
 
     /**
-     * Corutina que lanza estados auxiliares
+     * Crea un número random (0-3) y lo guarda en Datos.
+     */
+    private fun crearRandom() {
+        Datos.numero = Random.nextInt(0, 4) // Genera 0, 1, 2, o 3
+        Log.d(TAG_LOG, "Random creado: ${Datos.numero}")
+        actualizarEstado(Estados.ADIVINANDO) // Pasa al estado de adivinar
+    }
+
+    /**
+     * Inicia la corrutina de cuenta atrás.
+     */
+    private fun iniciarCuentaAtras() {
+        // Cancela la corrutina anterior si existe
+        countdownJob?.cancel()
+        // Reinicia el contador
+        _cuentaAtras.intValue = Datos.cuentaAtras
+
+        // Lanza una nueva corrutina
+        countdownJob = viewModelScope.launch {
+            while (_cuentaAtras.intValue > 0 && isActive) {
+                delay(1000) // Espera 1 segundo
+                actualizarCuentaAtras(_cuentaAtras.intValue - 1)
+            }
+            // Si la corrutina termina sin ser cancelada (tiempo agotado)
+            if (isActive) {
+                Log.d(TAG_LOG, "Tiempo agotado. Volviendo a INICIO.")
+                actualizarEstado(Estados.FINALIZADO) // Muestra FIN
+                delay(1500)
+                actualizarEstado(Estados.INICIO) // Vuelve a INICIO
+            }
+        }
+    }
+
+    /**
+     * Función que aplica la lambda del estado a un mensaje y lo imprime en Logcat.
      */
     fun estadosAuxiliares(msg: String = "") {
         viewModelScope.launch {
-            // inicializamos estado auxiliar
-            // los recorremos
-            var estadoAux = EstadosAuxiliares.AUX1
-            Log.d(TAG_LOG, "estado (corutina): ${estadoAux}")
-            Log.d(TAG_LOG, "mensaje (corutina): ${msg}")
-            delay(1500)
-            estadoAux = EstadosAuxiliares.AUX2
-            Log.d(TAG_LOG, "estado (corutina): ${estadoAux}")
-            Log.d(TAG_LOG, "mensaje (corutina): ${msg}")
-            delay(1500)
-            estadoAux = EstadosAuxiliares.AUX3
-            Log.d(TAG_LOG, "estado (corutina): ${estadoAux}")
-            Log.d(TAG_LOG, "mensaje (corutina): ${msg}")
-            delay(1500)
+            // Recorremos los estados requeridos (GENERANDO, ADIVINANDO, CONTANDO)
+            val estadosTransformadores = listOf(Estados.GENERANDO, Estados.ADIVINANDO, Estados.CONTANDO)
+
+            for (estado in estadosTransformadores) {
+                // Usamos la lambda del estado para transformar el mensaje
+                val mensajeTransformado = estado.lambdaFunction(msg)
+
+                // El Logcat imprime el mensaje transformado
+                Log.d(TAG_LOG, "ESTADO AUX: ${estado}")
+                Log.d(TAG_LOG, "MENSAJE (corutina): ${mensajeTransformado}")
+
+                delay(500) // Pausa para ver los logs
+            }
         }
+    }
+
+    /**
+     * Comprueba si el botón pulsado es el correcto.
+     */
+    fun comprobar(ordinal: Int): Boolean {
+        // Solo comprueba si el juego está activo
+        if (_estadoJuego.value == Estados.ADIVINANDO || _estadoJuego.value == Estados.CONTANDO) {
+            if (ordinal == Datos.numero) {
+                Log.d(TAG_LOG, "Acierto!")
+                countdownJob?.cancel() // Cierra el contador
+                actualizarEstado(Estados.INICIO) // Vuelve a INICIO
+                // LLAMADA E3: Al acertar
+                estadosAuxiliares("GANADOR! Juego reseteado")
+                return true
+            } else {
+                Log.d(TAG_LOG, "Error, inténtalo de nuevo")
+                // LLAMADA E3: Al fallar
+                estadosAuxiliares("FALLO. Intenta de nuevo")
+                return false
+            }
+        }
+        return false
+    }
+
+    // --- Funciones de actualización de estado ---
+    private fun actualizarCuentaAtras(nuevoValor: Int) {
+        _cuentaAtras.intValue = nuevoValor
+    }
+
+    private fun actualizarEstado(nuevoEstado: Estados) {
+        Datos.estadoJuego = nuevoEstado
+        _estadoJuego.value = nuevoEstado
+        Log.d(TAG_LOG, "Estado cambiado a: ${nuevoEstado}")
     }
 }
