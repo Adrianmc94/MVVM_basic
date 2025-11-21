@@ -1,138 +1,113 @@
 package com.dam.mvvm_basic
-
 import android.util.Log
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 /**
  * Interfaz de usuario
- * Modificado desde Code
  */
-
 @Composable
-fun IU(miViewModel: MyViewModel) {
-    // para que sea mas facil la etiqueta del log
-    // val TAG_LOG = "miDebug"
+fun IU(miViewModel: MyViewModel = viewModel()) {
+    // Observamos el estado del juego para actualizar la UI
+    val estadoJuego by miViewModel._estadoJuego
+    val cuentaAtras by miViewModel._cuentaAtras
 
-    // botones en horizontal
-    Column(
-        modifier= Modifier.fillMaxWidth().fillMaxHeight().padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceAround)
-    {
-        Column {
-            Row {
-                // creo un boton rojo
-                Boton(miViewModel, Colores.CLASE_ROJO)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
-                // creo un boton verde
-                Boton(miViewModel, Colores.CLASE_VERDE)
-            }
-            Row {
-                // creo un boton azul
-                Boton(miViewModel, Colores.CLASE_AZUL)
-
-                // creo un boton amarillo
-                Boton(miViewModel, Colores.CLASE_AMARILLO)
-            }
+        // Cuadro de texto para mostrar la cuenta atrás
+        if (estadoJuego == Estados.CONTANDO) {
+            Text(
+                text = "empezó escoge!! $cuentaAtras...",
+                fontSize = 30.sp,
+                color = if (cuentaAtras <= 2) Colores.CLASE_ROJO.color else Colores.CLASE_AZUL.color
+            )
+        } else if (estadoJuego == Estados.FINALIZADO) {
+            Text(text = "TIEMPO AGOTADO!!!", fontSize = 24.sp, color = Colores.CLASE_ROJO.color)
+        } else {
+            Text(text = "Adivina el Color", fontSize = 24.sp)
         }
-        // creao boton Start
-        Boton_Start(miViewModel, Colores.CLASE_START)
+
+        Spacer(modifier = Modifier.size(20.dp))
+
+        // Botones de colores
+        Boton(miViewModel, Colores.CLASE_ROJO, estadoJuego)
+        Boton(miViewModel, Colores.CLASE_VERDE, estadoJuego)
+        Boton(miViewModel, Colores.CLASE_AZUL, estadoJuego)
+        Boton(miViewModel, Colores.CLASE_AMARILLO, estadoJuego)
+
+
+        // Botón Start
+        Boton_Start(miViewModel, Colores.CLASE_START, estadoJuego)
     }
 }
-
 @Composable
-fun Boton(miViewModel: MyViewModel, enum_color: Colores) {
+fun Boton(miViewModel: MyViewModel, enum_color: Colores, estadoActual: Estados) {
 
-    // para que sea mas facil la etiqueta del log
-    val TAG_LOG = "miDebug"
-
-    // variable para el estado del boton
-    var _activo = miViewModel.estadoActual.collectAsState().value.boton_activo
+    val TAG_LOG: String = "miDebug"
+    // El botón solo está activo si estamos ADIVINANDO o CONTANDO
+    val isEnabled = estadoActual == Estados.ADIVINANDO || estadoActual == Estados.CONTANDO
 
 
-    // separador entre botones
     Spacer(modifier = Modifier.size(10.dp))
 
+
     Button(
-        enabled = _activo,
-        // utilizamos el color del enum
         colors =  ButtonDefaults.buttonColors(enum_color.color),
         onClick = {
-            Log.d(TAG_LOG, "Dentro del boton: ${enum_color.ordinal}")
+            Log.d(TAG_LOG, "Botón pulsado: ${enum_color.ordinal}")
             miViewModel.comprobar(enum_color.ordinal)
-                  },
+        },
+        enabled = isEnabled, // Control de habilitación
         modifier = Modifier
             .size((80).dp, (40).dp)
     ) {
-        // utilizamos el texto del enum
-        Text(text = enum_color.txt, fontSize = 10.sp)
+        Text(text = enum_color.txt, fontSize = 10.sp, color = if (enum_color == Colores.CLASE_AMARILLO) Colores.CLASE_START.color else Colores.CLASE_START.color)
     }
 }
 
 @Composable
-fun Boton_Start(miViewModel: MyViewModel, enum_color: Colores) {
+fun Boton_Start(miViewModel: MyViewModel, enum_color: Colores, estadoActual: Estados) {
 
-    // para que sea mas facil la etiqueta del log
-    val TAG_LOG = "miDebug"
 
-    // variable para el estado del boton
-    var _activo = miViewModel.estadoActual.collectAsState().value.start_activo
+    val TAG_LOG: String = "miDebug"
+    // El botón Start solo está activo en INICIO
+    val isEnabled = estadoActual == Estados.INICIO
 
-    // variable para el color del boton usado en el LaunchedEffect
-    var _color by remember { mutableStateOf(enum_color.color) }
 
-    // cremos el efecto de parpadear con Launchedffect
-    // mientras el estado es INICIO el boton start parpadea
-    // si cambia _activo, el LaunchedEffect se inicia o se para
-    // https://developer.android.com/develop/ui/compose/side-effects?hl=es-419#launchedeffect
-
-    LaunchedEffect(_activo) {
-        Log.d(TAG_LOG, "LaunchedEffect - Estado: ${_activo}")
-        // solo si el boton está activo parpadea
-        while (_activo) {
-            _color = enum_color.color_suave
-            delay(100)
-            _color = enum_color.color
-            delay(500)
-        }
-    }
-    // separador entre botones
     Spacer(modifier = Modifier.size(40.dp))
     Button(
-        enabled = _activo,
-        // utilizamos el color del enum
-        // colors =  ButtonDefaults.buttonColors(enum_color.color),
-        colors = ButtonDefaults.buttonColors(_color),
+        colors =  ButtonDefaults.buttonColors(enum_color.color),
         onClick = {
-            Log.d(TAG_LOG, "Dentro del Start - Estado: ${miViewModel.estadoActual.value.name}")
-            miViewModel.crearRandom()
+            Log.d(TAG_LOG, "Dentro del Start")
+            miViewModel.iniciarJuego() // Llama a la nueva función de inicio
         },
+        enabled = isEnabled, // Control de habilitación
         modifier = Modifier
             .size((100).dp, (40).dp)
     ) {
-        // utilizamos el texto del enum
-        Text(text = enum_color.txt, fontSize = 10.sp)
+        val buttonText = when (estadoActual) {
+            Estados.FINALIZADO -> "REINTENTAR"
+            Estados.GENERANDO -> "..."
+            Estados.ADIVINANDO, Estados.CONTANDO -> "JUGANDO"
+            else -> "START"
+        }
+        Text(text = buttonText, fontSize = 10.sp, color = Colores.CLASE_ROJO.color)
     }
+}
+@Preview(showBackground = true)
+@Composable
+fun IUPreview() {
+    IU(MyViewModel())
 }
