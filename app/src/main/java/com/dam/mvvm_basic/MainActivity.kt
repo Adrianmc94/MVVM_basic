@@ -4,26 +4,33 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+// Importaciones clave para el Singleton
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.dam.mvvm_basic.ui.theme.MVVM_basicTheme
 
-// Definimos la factoría como un Singleton (val) fuera de la Activity
-// Esto garantiza que el ViewModel creado sea el mismo para toda la app
+// 1. DEFINICIÓN DEL SINGLETON
+// Definimos la factoría como una variable global (val) fuera de la Activity.
+// Esto garantiza que el constructor de MyViewModel() se llame UNA SOLA VEZ
 val SingletonFactory: ViewModelProvider.Factory = viewModelFactory {
-    // El initializer define cómo se crea la única instancia del ViewModel
     initializer {
-        MyViewModel()
+        MyViewModel() // La única vez que se llama al constructor
     }
 }
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ELIMINAMOS la inicialización directa que crea una nueva instancia en cada onCreate:
+        // val miViewModel: MyViewModel = MyViewModel()
+
         enableEdgeToEdge()
         setContent {
             MVVM_basicTheme {
-                // 2. Llamamos a la IU pasando la SingletonFactory
+                // 2. LLAMAMOS a la IU, pasándole la Factoría Singleton.
+                // Compose se encargará de obtener la instancia única.
                 IU(factory = SingletonFactory)
             }
         }
